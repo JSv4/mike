@@ -81,6 +81,43 @@ editor's own saved bytes retain the current editor and undo history. Reads that
 span a local edit or save cannot replace it with stale content. Reloading with unsaved edits triggers a leave-page
 warning. Existing Mike edit cards still resolve through the backend.
 
+## Comparing versions
+
+**Projects and Library.** Open the document and choose **Compare versions**
+beside **Versions**. On a phone, the same action appears beneath the document
+title. Choose the version to compare against. If there is only one other Word
+version, the button opens that comparison directly.
+
+![Document preview showing V3 open and choices to compare with V2 or V1](assets/word-comparison/history.png)
+
+**Chat viewer.** Open the version menu beside the document title. Choose
+**Compare with V1** to keep the displayed version open and see how it differs
+from V1. The menu includes older and newer Word versions.
+
+![Chat viewer with V3 selected and Compare with V2 and Compare with V1 in the version menu](assets/word-comparison/chat.png)
+
+**Reading the redline.** In this example, comparing V3 against V1 shows
+“thirty” deleted and “ninety” inserted. Accepting all changes in Word produces
+V3. The redline header shows the filename and the direction of comparison.
+**Download** saves the Word file, even if its preview cannot render. Use the
+close button beside **Download** to return to the source document. Switching
+versions also closes the comparison.
+
+![V1 to V3 redline showing the notice period changing from thirty to ninety days](assets/word-comparison/redline.png)
+
+`GET /single-documents/:documentId/versions/compare?base=<id>&target=<id>`
+returns the generated Word file. The caller must have read access, and both
+versions must belong to the document and be Word files of 20 MiB or less.
+The menu explains the limit when a version's size is known. Tracked changes
+pending in either input are accepted before comparison, as in Word's Compare.
+
+`DocxDiffEngine` in `backend/src/lib/docxDiff` selects the implementation using
+`DOCX_DIFF_ENGINE`. The default is [Docxodus](https://github.com/JSv4/Docxodus).
+Each API process admits one comparison at a time, before downloading the two
+inputs. A dedicated worker runs the WebAssembly engine with a 60-second
+deadline. Concurrent requests receive HTTP 429 and the viewer offers a retry.
+The generated redline is held in memory for the request.
+
 ## Version and behavior
 
 `@docx-editor.dev/react`, `@docx-editor.dev/core`, and

@@ -1,0 +1,15 @@
+.host {
+    background: var(--app-surface, transparent);
+}
+
+.scroll {
+    padding: 1.5rem 1rem 4rem;
+}
+
+/* The tracked change an edit card points at, in the citation fill used by the
+   PDF viewer and the other DOCX engine. */
+.host :global(.docxodus-revision-active) {
+    background-color: var(--pdf-highlight-background);
+    border-radius: 2px;
+    box-shadow: 0 0 0 2px var(--pdf-highlight-background);
+}

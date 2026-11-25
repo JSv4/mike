@@ -23,6 +23,8 @@ export function EditDocument() {
     const [edit, setEdit] = useState(false);
     const [laterEdit, setLaterEdit] = useState(false);
     const [name, setName] = useState("Synthetic agreement.docx");
+    // `?engine=docxodus` opens the catalog directly on the view-only engine.
+    const [docxodus, setDocxodus] = useState(() => new URLSearchParams(window.location.search).get("engine") === "docxodus");
     useEffect(() => {
         let cancelled = false;
         let objectUrl: string | undefined;
@@ -80,6 +82,7 @@ export function EditDocument() {
     return (
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-2">
+                <TabPillButtonUI active={docxodus} onClick={() => setDocxodus(!docxodus)}>Docxodus engine (view only)</TabPillButtonUI>
                 <TabPillButtonUI active={narrow} onClick={() => setNarrow(!narrow)}>Narrow panel</TabPillButtonUI>
                 <TabPillButtonUI active={quote} onClick={() => setQuote(!quote)}>Highlight citation</TabPillButtonUI>
                 <TabPillButtonUI active={laterQuote} onClick={() => setLaterQuote(!laterQuote)}>Highlight later citation</TabPillButtonUI>
@@ -107,7 +110,7 @@ export function EditDocument() {
                         : (quote || laterQuote || tableQuote) ? <CitationQuotesSection citationRef={1}
                             quotes={[{ id: "sample", quote: tableQuote ? tableCitation : laterQuote ? "Clause 70. Confidential information must be protected by each party." : "Payment is due within thirty days." }]}
                             activeQuoteId="sample" onClose={() => { setQuote(false); setLaterQuote(false); setTableQuote(false); }} /> : undefined}>
-                {url && <DocxView documentId={url} displayUrl={url} cacheBytes={false} filename={name} defaultMode="edit" author="Sample reviewer"
+                {url && <DocxView engine={docxodus ? "docxodus" : "eigenpal"} documentId={url} displayUrl={url} cacheBytes={false} filename={name} defaultMode="edit" author="Sample reviewer"
                     toolbarVisible={toolbarVisible}
                     quotes={tableQuote ? [{ quote: tableCitation }] : laterQuote ? [{ quote: "Clause 70. Confidential information must be protected by each party." }]
                         : quote ? [{ quote: "Payment is due within thirty days." }] : []}

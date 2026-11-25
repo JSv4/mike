@@ -4,8 +4,9 @@ const config = {
     define: { "process.env": "{}" },
     build: { target: "esnext" },
     optimizeDeps: {
-        // Preserve EigenPal's import.meta.url font and WASM assets.
-        exclude: ["@docx-editor.dev/fonts", "@docx-editor.dev/core", "@docx-editor.dev/react"],
+        // Preserve EigenPal's import.meta.url font and WASM assets, and
+        // Docxodus's runtime import of its WebAssembly loader.
+        exclude: ["@docx-editor.dev/fonts", "@docx-editor.dev/core", "@docx-editor.dev/react", "docxodus"],
         esbuildOptions: { target: "esnext" },
     },
 };

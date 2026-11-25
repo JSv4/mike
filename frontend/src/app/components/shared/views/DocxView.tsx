@@ -1,6 +1,6 @@
 "use client";
 
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useFetchDocxBytes } from "@/app/hooks/useFetchDocxBytes";
 import { useDocxAutosave } from "@/app/hooks/useDocxAutosave";
@@ -11,8 +11,8 @@ import type { DocxCloseGuard, DocxMode, DocxSaveState, DocxSurface } from "./Doc
 import type { CitationQuote } from "../types";
 import { WarningPopup } from "@/app/components/popups/WarningPopup";
 import { viewRoundingClass, type ViewRounding } from "./viewRounding";
+import { activeDocxEngine, getDocxEngine, type DocxEngineId } from "./docxEngines";
 
-const DocxRenderer = lazy(() => import("./EigenpalDocxRenderer"));
 const RENDER_ERROR = "This document could not be displayed. Please download it to view it.";
 const bufferIds = new WeakMap<ArrayBuffer, number>();
 let nextBufferId = 0;
@@ -58,6 +58,8 @@ interface Props {
     initialScrollTop?: number | null;
     onScrollChange?: (scrollTop: number) => void;
     rounded?: ViewRounding;
+    /** Overrides the build's configured engine; for standalone previews and tests. */
+    engine?: DocxEngineId;
 }
 
 function focusHighlights(surface: DocxSurface, props: Props): boolean {
@@ -82,7 +84,7 @@ function focusHighlights(surface: DocxSurface, props: Props): boolean {
 /** DOCX view/edit surface shared by the assistant panel and project IDE. */
 export function DocxView(props: Props) {
     // A different document/version must never briefly display the previous file.
-    return <DocxViewContent key={JSON.stringify([props.documentId, props.versionId, props.displayUrl])} {...props} />;
+    return <DocxViewContent key={JSON.stringify([props.documentId, props.versionId, props.displayUrl, props.engine])} {...props} />;
 }
 
 /** Manage the mounted document editor and its unsaved-change close guard. */
@@ -91,7 +93,12 @@ function DocxViewContent(props: Props) {
         documentId, versionId, displayUrl, refetchKey, cacheBytes = true,
         warning, onWarningDismiss, onDownloadReady, onSaveStateChange, rounded = true,
     } = props;
-    const [initialMode] = useState<DocxMode>(props.defaultMode ?? "view");
+    // One engine per mounted document; a view-only engine never autosaves and
+    // is never handed an edit mode or a toolbar.
+    const [engine] = useState(() => props.engine ? getDocxEngine(props.engine) : activeDocxEngine());
+    const DocxRenderer = engine.Renderer;
+    const canEdit = props.canEdit !== false && engine.capabilities.edit;
+    const [initialMode] = useState<DocxMode>(engine.capabilities.edit ? props.defaultMode ?? "view" : "view");
     const [downloading, setDownloading] = useState(false);
     const [downloadError, setDownloadError] = useState<string | null>(null);
     const fetched = useFetchDocxBytes(documentId, versionId, refetchKey, displayUrl, cacheBytes);
@@ -107,7 +114,7 @@ function DocxViewContent(props: Props) {
     const surfaceRef = useRef<DocxSurface | null>(null);
     const autosave = useDocxAutosave({
         documentId, versionId, filename: props.filename, bytes,
-        enabled: props.canEdit !== false && !displayUrl,
+        enabled: canEdit && !displayUrl,
         exportDocx: () => surfaceRef.current?.exportDocx?.(),
     });
     const { markChanged, adoptSnapshot, captureSnapshotRevision } = autosave;
@@ -165,10 +172,10 @@ function DocxViewContent(props: Props) {
     }, [renderKey, focusSurface]);
     const onError = useCallback(() => setFailedKey(renderKey), [renderKey]);
     const onChange = useCallback(() => {
-        if (props.canEdit === false || !surfaceRef.current?.content.isConnected) return;
+        if (!canEdit || !surfaceRef.current?.content.isConnected) return;
         setEditedBytes(bytes);
         markChanged();
-    }, [bytes, markChanged, props.canEdit]);
+    }, [bytes, markChanged, canEdit]);
     const download = useCallback(async (providedBytes?: ArrayBuffer) => {
         const surface = surfaceRef.current;
         if (!surface?.exportDocx || downloading) return;
@@ -236,7 +243,7 @@ function DocxViewContent(props: Props) {
                     {bytes && (
                         <DocxRenderBoundary key={renderKey} onError={onError}>
                             <Suspense fallback={null}>
-                                <DocxRenderer bytes={bytes} mode={initialMode} toolbarVisible={props.canEdit === false ? false : props.toolbarVisible} filename={props.filename} author={props.author} onChange={onChange} onSave={displayUrl ? download : autosave.save} onReady={onReady} onError={onError} />
+                                <DocxRenderer bytes={bytes} mode={initialMode} toolbarVisible={canEdit ? props.toolbarVisible : false} filename={props.filename} author={props.author} onChange={onChange} onSave={displayUrl ? download : autosave.save} onReady={onReady} onError={onError} />
                             </Suspense>
                         </DocxRenderBoundary>
                     )}

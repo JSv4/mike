@@ -36,3 +36,7 @@ backend/supabase/*
 
 # Local review artifact; it is a nested repository, not application source.
 /pr-267-analysis-site/
+
+# Docxodus WebAssembly runtime, copied from node_modules by
+# frontend/scripts/copy-docxodus-wasm.mjs before dev and build.
+frontend/public/docxodus/

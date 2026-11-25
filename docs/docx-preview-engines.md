@@ -1,7 +1,14 @@
 # DOCX editor
 
+`DocxView` renders through an engine chosen from a small registry
+(`frontend/src/app/components/shared/views/docxEngines.ts`). EigenPal is the
+default and the only engine that edits; Docxodus is an opt-in, view-only
+engine. See [Rendering engines](#rendering-engines) for how to select one and
+what an engine has to implement. Everything below describes the default
+EigenPal engine unless it says otherwise.
+
 `DocxView` uses EigenPal for the assistant document panel, IDE document viewer,
-and document side panels. There is no rendering-engine selector. The formatting
+and document side panels. The formatting
 toolbar starts hidden in the assistant side panel and visible in the IDE.
 The title-row **Edit** button controls editing and toolbar visibility in both
 surfaces, with darker text while active. When off, EigenPal enforces read-only
@@ -162,6 +169,73 @@ EigenPal owns the revision highlight, scrolling, and repainting. If the insertio
 and deletion belong to separate review items, a native text selection spans both
 parts, including the unchanged text between them. Dismissing Mike's edit card
 clears its highlight while preserving a subsequent user selection or activation.
+
+## Rendering engines
+
+An engine is a React component that takes `DocxRendererProps` and, once the
+document is on screen, hands the host a `DocxSurface` through `onReady`
+(`DocxRenderer.types.ts`). The host owns fetching, autosave, close guards,
+citations and edit cards and never names an engine; the engine owns parsing,
+layout and whatever editing it supports. Each engine is a separate lazy chunk,
+so a build only downloads the one it uses.
+
+| Engine | Id | Edit | Suggest | Comment | Notes |
+| --- | --- | --- | --- | --- | --- |
+| EigenPal | `eigenpal` | yes | yes | yes | Default. |
+| Docxodus | `docxodus` | no | no | no | View-only; shows tracked changes and existing comments. |
+
+Select the engine for a build with `NEXT_PUBLIC_DOCX_ENGINE` (`eigenpal` or
+`docxodus`; anything else, or nothing, selects the default). It is a build-time
+value, like every `NEXT_PUBLIC_` variable. Standalone previews and tests can
+pass `engine` to `DocxView` instead.
+
+The registry also declares each engine's capabilities. With an engine that
+cannot edit, `DocxView` opens in view mode, never enables autosave and ignores
+change events, and the title row does not offer **Edit**, whatever the
+document's permissions say. Download still works.
+
+### Docxodus (view-only)
+
+[Docxodus](https://github.com/JSv4/Docxodus) (MIT) is a .NET OOXML engine
+compiled to WebAssembly; the document is parsed and laid out in the browser and
+never sent to a conversion service. `DocxodusDocxRenderer` opens it with
+`editable: false` and inline tracked changes. `docxodusSurface.ts` adapts it to
+the host:
+
+- **Edit cards** resolve through the engine's revision registry by OOXML
+  `w:id` (`ins_w_id` / `del_w_id`), so repeated wording elsewhere cannot take
+  the highlight. An insertion and a deletion that share a numeric id are kept
+  apart by kind.
+- **Citations** use Mike's own tolerant DOM quote matcher
+  (`highlightDocxQuote`), because the engine's `find()` only searches editable
+  blocks and a read-only document has none.
+- **Download** returns exactly the bytes that were opened.
+
+The WebAssembly runtime (about 13 MB uncompressed, about 3.2 MB over the wire
+from a host that serves the shipped `.br` files) is loaded with a runtime
+`import()` and cannot be bundled. `frontend/scripts/copy-docxodus-wasm.mjs`
+copies it from `node_modules/docxodus/dist/wasm` to the git-ignored
+`frontend/public/docxodus/wasm` before `dev`, `build` and `catalog:docx`, and
+skips the copy when the installed version is already there. To serve it from
+another origin, set `NEXT_PUBLIC_DOCXODUS_WASM_PATH` to that directory's URL.
+It is fetched only when a DOCX is opened with this engine.
+
+Not implemented for this engine: editing, suggesting, creating or changing
+comments, the navigation pane, and zoom/page controls. Long documents render as
+one continuous column rather than as pages.
+
+### Adding an engine
+
+1. Write a default-exported component that implements `DocxRendererProps`,
+   calls `onReady` with a `DocxSurface` once content is in the DOM, and calls
+   `onError` when the file cannot be opened. `content` and `scroll` are
+   required; every other surface member is optional and the host degrades
+   without it.
+2. Register it in `docxEngines.ts` with a static `import()` and its
+   capabilities, and add its id to `DocxEngineId`.
+3. Cover the surface with tests like `docxodusSurface.test.ts`, and pin the
+   engine behaviour the adapter relies on with a real-engine test like
+   `docxodusEngine.integration.test.ts`.
 
 ## Try the editor without backend services
 

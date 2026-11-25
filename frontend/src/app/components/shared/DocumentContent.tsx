@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PdfView } from "./views/PdfView";
 import { DocxView } from "./views/DocxView";
+import { activeDocxEngine } from "./views/docxEngines";
 import type { DocxCloseGuard, DocxSaveState } from "./views/DocxRenderer.types";
 import { SpreadsheetView } from "./views/SpreadsheetView";
 import {
@@ -235,7 +236,7 @@ export function DocumentContent({
                         onDownload={() => localDownload.current?.()}
                         toolbarVisible={toolbarVisible}
                         onToggleToolbar={
-                            !isExternalSource && viewType === "docx" && canEdit
+                            !isExternalSource && viewType === "docx" && canEdit && activeDocxEngine().capabilities.edit
                                 ? () => setToolbarVisible((visible) => !visible)
                                 : undefined
                         }
